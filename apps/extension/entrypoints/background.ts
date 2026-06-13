@@ -3,6 +3,8 @@ import {
   resurrect,
   listVersions,
   getEditFeed,
+  mergeVersions,
+  mergeEdits,
   shouldCapture,
   inlineResources,
   sampleLinks,
@@ -145,16 +147,34 @@ export default defineBackground(() => {
       }
 
       if (message?.type === "lazarus:feed") {
-        return { edits: await getEditFeed(store, message.limit ?? 50) };
+        // Global feed = your local edits unioned with the crowd-witnessed remote
+        // feed. Remote failure degrades to local-only (never rejects).
+        const limit = message.limit ?? 50;
+        const [local, remote] = await Promise.all([
+          getEditFeed(store, limit),
+          index.feed(limit).catch(() => []),
+        ]);
+        return { edits: mergeEdits(local, remote, limit) };
       }
 
       if (message?.type === "lazarus:versions") {
-        return { versions: await listVersions(store, message.url) };
+        // Cross-user timeline = local versions unioned with the network's.
+        const [local, remote] = await Promise.all([
+          listVersions(store, message.url),
+          index.listVersions(message.url).catch(() => []),
+        ]);
+        return { versions: mergeVersions(local, remote) };
       }
 
       if (message?.type === "lazarus:snapshot") {
         const bytes = await store.getSnapshot(message.cid);
-        return { html: bytes ? new TextDecoder().decode(bytes) : null };
+        if (bytes) return { html: new TextDecoder().decode(bytes) };
+        // Not held locally (a version preserved by others): try a peer first,
+        // then the central blob endpoint (which serves promoted cids only).
+        const remoteHtml =
+          (await p2pFetchHtml(message.cid)) ??
+          (await index.fetchBlobHtml(message.cid).catch(() => null));
+        return { html: remoteHtml ?? null };
       }
 
       if (message?.type !== "lazarus:capture") return;

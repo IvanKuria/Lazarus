@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildApp } from "../src/app.js";
 import { MemoryIndexService } from "../src/index-service.js";
+import { buildObservation } from "@lazarus/core";
 
 const bytes = (s: string) => new TextEncoder().encode(s);
 const b64 = (u: Uint8Array) => Buffer.from(u).toString("base64");
@@ -118,6 +119,37 @@ describe("Sybil-resistant witness tokens", () => {
     expect((await app.inject({ method: "POST", url: "/v1/witness" })).statusCode).toBe(200);
     expect((await app.inject({ method: "POST", url: "/v1/witness" })).statusCode).toBe(200);
     expect((await app.inject({ method: "POST", url: "/v1/witness" })).statusCode).toBe(429);
+    await app.close();
+  });
+});
+
+describe("GET /v1/blob?cid= (cid-addressed historical blobs)", () => {
+  it("serves a promoted cid's blob but withholds an un-promoted one (k-anonymity gate)", async () => {
+    const app = buildApp(new MemoryIndexService({ k: 2 }), { witnessSecret: "s" });
+    const html = "<h1>versioned</h1>";
+    const body = { ...rawBody("https://x.com/v", html) };
+    const { cid } = await buildObservation({
+      url: "https://x.com/v",
+      snapshotBytes: bytes(html),
+      text: body.text,
+      capturedAt: body.capturedAt,
+      title: body.title,
+    });
+
+    // one witness → cid exists but NOT promoted → blob withheld
+    await app.inject({ method: "POST", url: "/v1/observations", payload: { ...body, witnessId: "w1" } });
+    const early = await app.inject({ method: "GET", url: "/v1/blob?cid=" + cid });
+    expect(early.statusCode).toBe(404);
+
+    // second witness → promoted → blob served
+    await app.inject({ method: "POST", url: "/v1/observations", payload: { ...body, witnessId: "w2" } });
+    const ok = await app.inject({ method: "GET", url: "/v1/blob?cid=" + cid });
+    expect(ok.statusCode).toBe(200);
+    expect(Buffer.from(ok.json().snapshotBase64, "base64").toString()).toBe(html);
+
+    // unknown cid → 404
+    const miss = await app.inject({ method: "GET", url: "/v1/blob?cid=deadbeef" });
+    expect(miss.statusCode).toBe(404);
     await app.close();
   });
 });

@@ -169,6 +169,18 @@ export function buildApp(service: IndexService, opts: BuildOpts = {}): FastifyIn
     return reply.send({ edits: await service.feed(limit) });
   });
 
+  // Cid-addressed blob fetch for historical versions (the Scrubber). Privacy-gated
+  // in the service: only promoted cids are served.
+  app.get("/v1/blob", async (req, reply) => {
+    const cid = (req.query as { cid?: string }).cid;
+    if (!cid) return reply.code(400).send({ error: "cid required" });
+    const blob = await service.getBlob(cid);
+    if (!blob) return reply.code(404).send({ found: false });
+    metrics.resurrectionsServed++;
+    analytics("blob_served", { sizeBytes: blob.length });
+    return reply.send({ snapshotBase64: Buffer.from(blob).toString("base64") });
+  });
+
   // ICE servers for the P2P data plane: public STUN always, ephemeral TURN creds
   // when configured. The TURN shared secret stays server-side and is never sent.
   app.get("/v1/turn-credentials", async (_req, reply) => {

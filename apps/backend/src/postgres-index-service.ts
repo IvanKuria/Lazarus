@@ -158,6 +158,17 @@ export class PostgresIndexService implements IndexService {
     return res.rows.map(rowToEdit);
   }
 
+  async getBlob(cid: string): Promise<Uint8Array | null> {
+    if (!this.blobs) return null;
+    // k-anonymity gate: only serve a blob whose cid is promoted somewhere.
+    const res = await this.pool.query(
+      `SELECT 1 FROM observations WHERE cid=$1 AND promoted=true LIMIT 1`,
+      [cid],
+    );
+    if (res.rows.length === 0) return null;
+    return this.blobs.get(cid);
+  }
+
   async ping(): Promise<boolean> {
     try {
       await this.pool.query("SELECT 1");

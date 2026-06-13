@@ -1,4 +1,4 @@
-import type { Observation } from "@lazarus/core";
+import type { Observation, EditEvent } from "@lazarus/core";
 import { bytesToBase64, base64ToBytes } from "./base64.js";
 
 /**
@@ -63,5 +63,30 @@ export class IndexClient {
       observation: data.observation,
       html: new TextDecoder().decode(base64ToBytes(data.snapshotBase64)),
     };
+  }
+
+  /** The cross-user version timeline for a URL (promoted versions only). */
+  async listVersions(url: string): Promise<Observation[]> {
+    const res = await fetch(
+      `${this.base}/v1/versions?url=${encodeURIComponent(url)}`,
+    );
+    if (!res.ok) return [];
+    return ((await res.json()) as { versions: Observation[] }).versions;
+  }
+
+  /** The global, crowd-witnessed Stealth-Edit Feed. */
+  async feed(limit?: number): Promise<EditEvent[]> {
+    const q = limit !== undefined ? `?limit=${limit}` : "";
+    const res = await fetch(`${this.base}/v1/feed${q}`);
+    if (!res.ok) return [];
+    return ((await res.json()) as { edits: EditEvent[] }).edits;
+  }
+
+  /** Fetch a historical version's HTML by cid (server serves promoted cids only). */
+  async fetchBlobHtml(cid: string): Promise<string | null> {
+    const res = await fetch(`${this.base}/v1/blob?cid=${encodeURIComponent(cid)}`);
+    if (!res.ok) return null;
+    const data = (await res.json()) as { snapshotBase64: string };
+    return new TextDecoder().decode(base64ToBytes(data.snapshotBase64));
   }
 }

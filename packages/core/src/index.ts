@@ -12,6 +12,7 @@ export { resurrect } from "./resurrect.js";
 export type { ResurrectResult } from "./resurrect.js";
 export { listVersions } from "./versions.js";
 export { getEditFeed } from "./feed.js";
+export { mergeVersions, mergeEdits } from "./merge.js";
 export { splitChunks, BlobAssembler, CHUNK_SIZE } from "./chunk.js";
 export { inlineResources } from "./inline.js";
 export { sampleLinks, summarizeMortality } from "./mortality.js";

@@ -21,6 +21,12 @@ export interface IndexService {
   locateLatest(url: string): Promise<Observation | null>;
   listVersions(url: string): Promise<Observation[]>;
   feed(limit?: number): Promise<EditEvent[]>;
+  /**
+   * Fetch a snapshot blob by cid — but ONLY if that cid belongs to a PROMOTED
+   * observation, preserving k-anonymity (never serve content below k witnesses).
+   * Powers cid-addressed fetch of historical versions in the Scrubber.
+   */
+  getBlob(cid: string): Promise<Uint8Array | null>;
   /** Liveness/connectivity check for /health. */
   ping(): Promise<boolean>;
 }
@@ -123,6 +129,19 @@ export class MemoryIndexService implements IndexService {
       (a, b) => b.nextCapturedAt - a.nextCapturedAt,
     );
     return limit === undefined ? sorted : sorted.slice(0, limit);
+  }
+
+  async getBlob(cid: string): Promise<Uint8Array | null> {
+    // k-anonymity gate: only serve a blob whose cid is promoted somewhere.
+    let promoted = false;
+    for (const list of this.promoted.values()) {
+      if (list.some((o) => o.cid === cid)) {
+        promoted = true;
+        break;
+      }
+    }
+    if (!promoted) return null;
+    return this.snapshots.get(cid) ?? null;
   }
 
   async ping(): Promise<boolean> {
