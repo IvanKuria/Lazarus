@@ -36,6 +36,17 @@ export interface CapturedPage {
   readerable?: boolean;
 }
 
+/** A preserved page summarized for the Memory view — one row per urlKey. */
+export interface PreservedPage {
+  urlKey: string;
+  /** Title of the most recently preserved version, if any. */
+  title?: string;
+  /** capturedAt of the most recent version. */
+  latestCapturedAt: number;
+  /** How many versions of this page are preserved locally. */
+  versionCount: number;
+}
+
 /** How a new version relates to the previous one for the same urlKey. */
 export type ChangeKind = "unchanged" | "edited" | "replaced";
 

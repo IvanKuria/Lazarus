@@ -1,5 +1,5 @@
-import type { ObservationStore } from "./store.js";
-import type { Observation, EditEvent } from "./types.js";
+import { type ObservationStore, summarizePages } from "./store.js";
+import type { Observation, EditEvent, PreservedPage } from "./types.js";
 
 /**
  * IndexedDB-backed observation store — the extension's real persistence layer.
@@ -111,5 +111,12 @@ export class IdbObservationStore implements ObservationStore {
     const all = (await reqToPromise(tx.objectStore(EDITS).getAll())) as EditEvent[];
     all.sort((a, b) => b.nextCapturedAt - a.nextCapturedAt);
     return limit === undefined ? all : all.slice(0, limit);
+  }
+
+  async listPages(): Promise<PreservedPage[]> {
+    const db = await this.open();
+    const tx = db.transaction(OBSERVATIONS, "readonly");
+    const all = (await reqToPromise(tx.objectStore(OBSERVATIONS).getAll())) as Observation[];
+    return summarizePages(all);
   }
 }

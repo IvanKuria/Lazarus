@@ -17,6 +17,7 @@ import type {
   VersionsResponse,
   SnapshotResponse,
   FeedResponse,
+  MemoryResponse,
   MortalityResponse,
 } from "../lib/protocol.js";
 import { scanMortality } from "../lib/mortality-scan.js";
@@ -139,11 +140,16 @@ export default defineBackground(() => {
       | VersionsResponse
       | SnapshotResponse
       | FeedResponse
+      | MemoryResponse
       | MortalityResponse
       | undefined
     > => {
       if (message?.type === "lazarus:mortality") {
         return scanMortality(message.sample ?? 60);
+      }
+
+      if (message?.type === "lazarus:memory") {
+        return { pages: await store.listPages() };
       }
 
       if (message?.type === "lazarus:feed") {

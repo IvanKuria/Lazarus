@@ -25,4 +25,5 @@ export type {
   CapturedPage,
   ChangeKind,
   EditEvent,
+  PreservedPage,
 } from "./types.js";

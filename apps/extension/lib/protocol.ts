@@ -1,4 +1,4 @@
-import type { Observation, EditEvent, MortalitySummary } from "@lazarus/core";
+import type { Observation, EditEvent, PreservedPage, MortalitySummary } from "@lazarus/core";
 
 /** Message contract between extension contexts (content script ⇄ background). */
 
@@ -63,6 +63,15 @@ export interface FeedResponse {
   edits: EditEvent[];
 }
 
+/** List every page this user has preserved locally (Memory view). */
+export interface MemoryMessage {
+  type: "lazarus:memory";
+}
+
+export interface MemoryResponse {
+  pages: PreservedPage[];
+}
+
 /** Run the "Digital Mortality" scan over the user's history (local only). */
 export interface MortalityMessage {
   type: "lazarus:mortality";
@@ -80,4 +89,5 @@ export type LazarusMessage =
   | VersionsMessage
   | SnapshotMessage
   | FeedMessage
+  | MemoryMessage
   | MortalityMessage;

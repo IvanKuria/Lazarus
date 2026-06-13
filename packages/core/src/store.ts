@@ -1,4 +1,27 @@
-import type { Observation, ChangeKind, EditEvent } from "./types.js";
+import type { Observation, ChangeKind, EditEvent, PreservedPage } from "./types.js";
+
+/** Build the Memory-view summary rows from a flat observation list. */
+function summarizePages(all: Observation[]): PreservedPage[] {
+  const byUrl = new Map<string, Observation[]>();
+  for (const o of all) {
+    const list = byUrl.get(o.urlKey) ?? [];
+    list.push(o);
+    byUrl.set(o.urlKey, list);
+  }
+  const pages: PreservedPage[] = [];
+  for (const [urlKey, list] of byUrl) {
+    const latest = list.reduce((a, b) => (b.capturedAt > a.capturedAt ? b : a));
+    pages.push({
+      urlKey,
+      ...(latest.title !== undefined && { title: latest.title }),
+      latestCapturedAt: latest.capturedAt,
+      versionCount: list.length,
+    });
+  }
+  return pages.sort((a, b) => b.latestCapturedAt - a.latestCapturedAt);
+}
+
+export { summarizePages };
 
 /** Outcome of recording a capture: what changed, and the resulting observation. */
 export interface RecordResult {
@@ -26,6 +49,8 @@ export interface ObservationStore {
   putEdit(event: EditEvent): Promise<void>;
   /** Recent edits, newest-first, optionally capped at `limit`. */
   listEdits(limit?: number): Promise<EditEvent[]>;
+  /** One summary row per preserved page (urlKey), most-recent first. */
+  listPages(): Promise<PreservedPage[]>;
 }
 
 /** In-memory store for tests and ephemeral use. */
@@ -70,5 +95,9 @@ export class MemoryObservationStore implements ObservationStore {
       (a, b) => b.nextCapturedAt - a.nextCapturedAt,
     );
     return limit === undefined ? sorted : sorted.slice(0, limit);
+  }
+
+  async listPages(): Promise<PreservedPage[]> {
+    return summarizePages([...this.timelines.values()].flat());
   }
 }
