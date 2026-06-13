@@ -5,7 +5,10 @@
 export type Signal = Record<string, unknown>;
 type SignalHandler = (from: string, signal: Signal) => void;
 
-const DEFAULT_URL = "ws://localhost:8787/signal";
+// Prod uses wss:// at the deployed origin (WXT_PUBLIC_* is inlined at build);
+// dev and tests fall back to the local docker-compose signaling hub.
+const DEFAULT_URL =
+  import.meta.env.WXT_PUBLIC_SIGNAL_URL ?? "ws://localhost:8787/signal";
 
 export class SignalingClient {
   private ws?: WebSocket;

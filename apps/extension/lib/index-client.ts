@@ -5,7 +5,10 @@ import { bytesToBase64, base64ToBytes } from "./base64.js";
  * Client for the central index plane. Submits observations (best-effort),
  * locates a CID for P2P fetch, and resurrects centrally as a fallback.
  */
-const DEFAULT_BASE = "http://localhost:8787";
+// Prod builds bake in the deployed origin via WXT's WXT_PUBLIC_* env inlining;
+// dev and tests fall back to the local docker-compose backend.
+const DEFAULT_BASE =
+  import.meta.env.WXT_PUBLIC_API_BASE ?? "http://localhost:8787";
 
 export interface RemoteResurrection {
   html: string;
