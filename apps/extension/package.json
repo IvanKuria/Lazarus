@@ -11,9 +11,11 @@
     "build:firefox": "wxt build -b firefox",
     "zip": "wxt zip",
     "compile": "wxt prepare && tsc --noEmit",
+    "e2e": "playwright test",
     "prepare": "wxt prepare"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@wxt-dev/module-react": "^1.2.2",
