@@ -28,6 +28,12 @@ export interface CapturedPage {
   text: string;
   capturedAt: number;
   title?: string;
+  /**
+   * Whether the page is article-like (Readability "readerable"). Dynamic pages
+   * (search results, dashboards, app UIs) are not, and are excluded from the
+   * Stealth-Edit Feed to suppress noise. Undefined is treated as readerable.
+   */
+  readerable?: boolean;
 }
 
 /** How a new version relates to the previous one for the same urlKey. */

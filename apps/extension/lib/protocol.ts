@@ -10,6 +10,8 @@ export interface CapturePayload {
   capturedAt: number;
   /** Absolute image URLs for the background to fetch + inline as data URIs. */
   resourceUrls: string[];
+  /** Article-like? Non-readerable pages are excluded from the Stealth-Edit Feed. */
+  readerable: boolean;
 }
 
 export interface CaptureMessage {

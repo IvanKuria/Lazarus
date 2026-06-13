@@ -21,10 +21,20 @@ const POST_V1 = `<!doctype html><html><head><title>Breaking News</title></head>
 const POST_V2 = `<!doctype html><html><head><title>Breaking News</title></head>
 <body><h1>Breaking News</h1><p>The mayor vetoed the budget instead. marker-VERSION-TWO entirely rewritten.</p></body></html>`;
 
+// Article-like content so Readability marks it readerable (the feed only
+// surfaces stealth edits on real articles, not dynamic pages).
 const MEMO_V1 = `<!doctype html><html><head><title>Project Memo</title></head>
-<body><h1>Project Memo</h1><p>Status: on track for the Q3 launch. memo-original baseline text.</p></body></html>`;
+<body><article><h1>Project Memo</h1>
+<p>The planning committee confirmed today that the flagship project remains firmly on track for its third-quarter launch, citing steady engineering progress and a healthy budget runway across all of the contributing teams.</p>
+<p>Leadership reiterated that no major scope changes are anticipated, and that the previously published timeline should be considered accurate and stable for partners planning around the release window this year.</p>
+<p>A more detailed status report, including staffing and dependency notes, will be circulated to stakeholders ahead of the next review. memo-original baseline text.</p>
+</article></body></html>`;
 const MEMO_V2 = `<!doctype html><html><head><title>Project Memo</title></head>
-<body><h1>Project Memo</h1><p>Status: quietly delayed to Q4 after scope changes. memo-revised replacement text entirely.</p></body></html>`;
+<body><article><h1>Project Memo</h1>
+<p>The planning committee disclosed today that the flagship project has quietly slipped to the fourth quarter, citing unexpected scope expansion and dependency delays that emerged across several of the contributing teams.</p>
+<p>Leadership now acknowledges significant changes to the plan, and warns that the previously published timeline should no longer be relied upon by partners planning around the release window this year.</p>
+<p>A revised status report, including the new staffing and dependency picture, will be circulated to stakeholders ahead of an urgent review. memo-revised replacement text entirely.</p>
+</article></body></html>`;
 let memoVersion: 1 | 2 = 1;
 
 // The test server flips between serving the article (200) and a 404.

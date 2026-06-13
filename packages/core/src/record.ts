@@ -16,28 +16,37 @@ export async function recordCapture(
   const observation = await buildObservation(page);
   const latest = await store.getLatestObservation(observation.urlKey);
 
-  if (latest && latest.cid === observation.cid) {
-    return { change: "unchanged", observation: latest };
+  if (latest) {
+    const distance = hammingDistance(latest.fingerprint, observation.fingerprint);
+    // Identical meaningful text (even if the raw HTML differs — rotating tokens,
+    // ads, session ids) is NOT a new version and NOT an edit. This is what keeps
+    // dynamic-page churn out of the timeline and the feed.
+    if (latest.cid === observation.cid || distance === 0) {
+      return { change: "unchanged", observation: latest };
+    }
+
+    await store.putSnapshot(observation.cid, page.snapshotBytes);
+    await store.putObservation(observation);
+
+    const change = classifyChange(latest, observation) as "edited" | "replaced";
+    // Only surface the change in the Stealth-Edit Feed for article-like pages —
+    // search results, dashboards, and app UIs change by design, not stealth.
+    if (page.readerable !== false) {
+      await store.putEdit({
+        urlKey: observation.urlKey,
+        ...(observation.title !== undefined && { title: observation.title }),
+        kind: change,
+        prevCid: latest.cid,
+        nextCid: observation.cid,
+        distance,
+        prevCapturedAt: latest.capturedAt,
+        nextCapturedAt: observation.capturedAt,
+      });
+    }
+    return { change, observation };
   }
 
   await store.putSnapshot(observation.cid, page.snapshotBytes);
   await store.putObservation(observation);
-
-  if (latest) {
-    // latest exists and cids differ → change is "edited" or "replaced".
-    const change = classifyChange(latest, observation) as "edited" | "replaced";
-    await store.putEdit({
-      urlKey: observation.urlKey,
-      ...(observation.title !== undefined && { title: observation.title }),
-      kind: change,
-      prevCid: latest.cid,
-      nextCid: observation.cid,
-      distance: hammingDistance(latest.fingerprint, observation.fingerprint),
-      prevCapturedAt: latest.capturedAt,
-      nextCapturedAt: observation.capturedAt,
-    });
-    return { change, observation };
-  }
-
   return { change: "new", observation };
 }

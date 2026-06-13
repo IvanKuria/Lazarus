@@ -48,6 +48,48 @@ describe("edit feed", () => {
     expect(feed[0]!.nextCapturedAt).toBe(2);
   });
 
+  it("does not log an edit when only cosmetic HTML changed (identical text)", async () => {
+    const store = new MemoryObservationStore();
+    // Same meaningful text, different raw bytes (rotating token / ad / session id).
+    await recordCapture(
+      store,
+      page({ snapshotBytes: bytes("<html>token=AAA</html>"), text: longText, capturedAt: 1 }),
+    );
+    const second = await recordCapture(
+      store,
+      page({ snapshotBytes: bytes("<html>token=ZZZ</html>"), text: longText, capturedAt: 2 }),
+    );
+
+    expect(second.change).toBe("unchanged");
+    expect(await store.getTimeline("https://example.com/p")).toHaveLength(1);
+    expect(await getEditFeed(store)).toEqual([]);
+  });
+
+  it("does not surface feed edits for non-readerable (dynamic) pages", async () => {
+    const store = new MemoryObservationStore();
+    await recordCapture(
+      store,
+      page({ text: longText, capturedAt: 1, readerable: false }),
+    );
+    const changed = longText.replace(
+      "paragraph 0 ",
+      "a wholly rewritten opening section entirely ",
+    );
+    await recordCapture(
+      store,
+      page({
+        snapshotBytes: bytes("v2-" + changed),
+        text: changed,
+        capturedAt: 2,
+        readerable: false,
+      }),
+    );
+
+    // The version is still stored (Resurrection works) but the feed stays quiet.
+    expect(await store.getTimeline("https://example.com/p")).toHaveLength(2);
+    expect(await getEditFeed(store)).toEqual([]);
+  });
+
   it("returns edits across pages newest-first", async () => {
     const store = new MemoryObservationStore();
     await recordCapture(store, page({ url: "https://a.com/x", capturedAt: 1 }));

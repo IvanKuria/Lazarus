@@ -1,4 +1,4 @@
-import { Readability } from "@mozilla/readability";
+import { Readability, isProbablyReaderable } from "@mozilla/readability";
 
 /**
  * Builds a high-fidelity, self-contained-ish snapshot from the live DOM.
@@ -12,6 +12,8 @@ export interface CapturedDom {
   html: string;
   text: string;
   resourceUrls: string[];
+  /** Article-like? Dynamic pages (search, dashboards) are excluded from the feed. */
+  readerable: boolean;
 }
 
 export function captureDom(doc: Document): CapturedDom {
@@ -53,9 +55,17 @@ export function captureDom(doc: Document): CapturedDom {
     }
   });
 
+  let readerable = false;
+  try {
+    readerable = isProbablyReaderable(doc);
+  } catch {
+    /* default to non-readerable (kept out of the feed) */
+  }
+
   return {
     html: "<!doctype html>" + root.outerHTML,
     text,
     resourceUrls: [...resourceUrls],
+    readerable,
   };
 }

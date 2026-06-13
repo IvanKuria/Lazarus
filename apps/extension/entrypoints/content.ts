@@ -36,6 +36,7 @@ export default defineContentScript({
           title: document.title,
           capturedAt: Date.now(),
           resourceUrls: captured.resourceUrls,
+          readerable: captured.readerable,
         },
       };
       const capture = (await browser.runtime.sendMessage(captureMsg)) as

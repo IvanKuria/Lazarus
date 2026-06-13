@@ -212,6 +212,7 @@ export default defineBackground(() => {
         text: page.text,
         title: page.title,
         capturedAt: page.capturedAt,
+        readerable: page.readerable,
       });
       console.log(
         `[lazarus] ${result.change}: ${result.observation.urlKey} (${result.observation.sizeBytes}B)`,

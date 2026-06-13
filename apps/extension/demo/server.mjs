@@ -17,16 +17,18 @@ const LOGO = `<p><img src="http://demo.lazarus.test/logo.svg" width="160" height
 
 const V1 = page(
   "The Quiet Announcement",
-  `<h1>The Quiet Announcement</h1>${LOGO}
-   <p><b>Version 1.</b> The committee said the budget is <b>on track</b> for the Q3 launch.</p>
-   <p>This is the original article text that Lazarus preserved. marker-ORIGINAL.</p>`,
+  `<article><h1>The Quiet Announcement</h1>${LOGO}
+   <p><b>Version 1.</b> The budget committee confirmed this morning that the flagship initiative remains firmly on track for its third-quarter launch, pointing to steady progress and a comfortable financial runway across every contributing team.</p>
+   <p>Officials stressed that no significant changes to the plan are expected, and that the published schedule should be treated as accurate and stable for anyone planning around the announcement in the months ahead.</p>
+   <p>This is the original article text that Lazarus preserved at capture time. marker-ORIGINAL.</p></article>`,
 );
 
 const V2 = page(
   "The Quiet Announcement",
-  `<h1>The Quiet Announcement</h1>${LOGO}
-   <p><b>Version 2.</b> The committee now says the budget is <b>delayed to Q4</b> after scope changes.</p>
-   <p>This paragraph was quietly added in the edit — Lazarus caught the change. marker-EDITED.</p>`,
+  `<article><h1>The Quiet Announcement</h1>${LOGO}
+   <p><b>Version 2.</b> The budget committee now concedes that the flagship initiative has slipped to the fourth quarter, blaming an unexpected expansion in scope and a series of dependency delays that surfaced across several contributing teams.</p>
+   <p>Officials acknowledge meaningful changes to the plan, and caution that the previously published schedule should no longer be relied upon by anyone planning around the announcement this year.</p>
+   <p>This paragraph was quietly rewritten in the edit — Lazarus caught the change. marker-EDITED.</p></article>`,
 );
 
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="60"><rect width="160" height="60" rx="8" fill="#7c3aed"/><text x="80" y="38" font-family="system-ui,sans-serif" font-size="22" fill="#fff" text-anchor="middle">LAZARUS</text></svg>`;
