@@ -15,6 +15,8 @@ export interface RecordResult {
 export interface ObservationStore {
   putSnapshot(cid: string, bytes: Uint8Array): Promise<void>;
   getSnapshot(cid: string): Promise<Uint8Array | undefined>;
+  /** All snapshot CIDs held locally — used to announce holdings to peers. */
+  listSnapshotCids(): Promise<string[]>;
   putObservation(obs: Observation): Promise<void>;
   /** Most recent observation for a urlKey, or undefined if never seen. */
   getLatestObservation(urlKey: string): Promise<Observation | undefined>;
@@ -38,6 +40,10 @@ export class MemoryObservationStore implements ObservationStore {
 
   async getSnapshot(cid: string): Promise<Uint8Array | undefined> {
     return this.snapshots.get(cid);
+  }
+
+  async listSnapshotCids(): Promise<string[]> {
+    return [...this.snapshots.keys()];
   }
 
   async putObservation(obs: Observation): Promise<void> {

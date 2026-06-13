@@ -1,26 +1,11 @@
 import type { Observation } from "@lazarus/core";
+import { bytesToBase64, base64ToBytes } from "./base64.js";
 
 /**
- * Client for the central index plane. Submits observations (best-effort) and
- * resurrects pages another browser preserved when the local store has no copy.
+ * Client for the central index plane. Submits observations (best-effort),
+ * locates a CID for P2P fetch, and resurrects centrally as a fallback.
  */
 const DEFAULT_BASE = "http://localhost:8787";
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-  }
-  return btoa(binary);
-}
-
-function base64ToBytes(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const out = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
-  return out;
-}
 
 export interface RemoteResurrection {
   html: string;
@@ -51,6 +36,15 @@ export class IndexClient {
         witnessId: params.witnessId,
       }),
     });
+  }
+
+  /** Resolve the latest promoted observation (CID + metadata) without the blob. */
+  async locate(url: string): Promise<Observation | null> {
+    const res = await fetch(
+      `${this.base}/v1/locate?url=${encodeURIComponent(url)}`,
+    );
+    if (!res.ok) return null;
+    return ((await res.json()) as { observation: Observation }).observation;
   }
 
   async resurrectLatest(url: string): Promise<RemoteResurrection | null> {

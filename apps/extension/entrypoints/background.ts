@@ -15,6 +15,7 @@ import type {
 } from "../lib/protocol.js";
 import { IndexClient } from "../lib/index-client.js";
 import { getWitnessId } from "../lib/witness.js";
+import { base64ToBytes } from "../lib/base64.js";
 
 /**
  * Service worker — the thin coordinator. Owns the single extension-origin store,
@@ -24,6 +25,46 @@ import { getWitnessId } from "../lib/witness.js";
 export default defineBackground(() => {
   const store = new IdbObservationStore("lazarus");
   const index = new IndexClient();
+
+  // Stand up the long-lived offscreen document that hosts P2P (WebRTC).
+  // chrome.offscreen typings vary across builds, so access it untyped.
+  const offscreenApi = (
+    globalThis as unknown as {
+      chrome: {
+        offscreen: {
+          hasDocument(): Promise<boolean>;
+          createDocument(opts: {
+            url: string;
+            reasons: string[];
+            justification: string;
+          }): Promise<void>;
+        };
+      };
+    }
+  ).chrome.offscreen;
+
+  async function ensureOffscreen(): Promise<void> {
+    try {
+      if (await offscreenApi.hasDocument()) return;
+      await offscreenApi.createDocument({
+        url: "offscreen.html",
+        reasons: ["WEB_RTC"],
+        justification: "Maintain peer connections to share preserved snapshots.",
+      });
+    } catch {
+      /* already exists or unsupported */
+    }
+  }
+  void ensureOffscreen();
+
+  // Ask the offscreen peer to fetch a blob by CID; returns the HTML or null.
+  async function p2pFetchHtml(cid: string): Promise<string | null> {
+    const res = (await browser.runtime
+      .sendMessage({ type: "p2p:fetch", cid })
+      .catch(() => null)) as { ok: boolean; base64: string | null } | null;
+    if (!res?.ok || !res.base64) return null;
+    return new TextDecoder().decode(base64ToBytes(res.base64));
+  }
 
   // tabId → status code of the most recent main-frame response in that tab.
   const mainFrameStatus = new Map<number, number>();
@@ -97,18 +138,27 @@ export default defineBackground(() => {
             },
           };
         }
-        const remote = await index.resurrectLatest(page.url).catch(() => null);
-        if (!remote) return { recorded: false };
-        return {
-          recorded: false,
-          resurrect: {
-            html: remote.html,
-            ...(remote.observation.title !== undefined && {
-              title: remote.observation.title,
-            }),
-            capturedAt: remote.observation.capturedAt,
-          },
-        };
+        // Locate the CID via the index, then fetch the blob peer-to-peer.
+        // Fall back to a central fetch only if no peer can serve it.
+        const located = await index.locate(page.url).catch(() => null);
+        if (located) {
+          const p2pHtml = await p2pFetchHtml(located.cid);
+          const html =
+            p2pHtml ??
+            (await index.resurrectLatest(page.url).catch(() => null))?.html ??
+            null;
+          if (html) {
+            return {
+              recorded: false,
+              resurrect: {
+                html,
+                ...(located.title !== undefined && { title: located.title }),
+                capturedAt: located.capturedAt,
+              },
+            };
+          }
+        }
+        return { recorded: false };
       }
 
       // Live page: record it.
@@ -138,6 +188,10 @@ export default defineBackground(() => {
               witnessId,
             }),
           )
+          .catch(() => {});
+        // Tell our offscreen peer to announce this new CID to the swarm.
+        void browser.runtime
+          .sendMessage({ type: "p2p:announce", cid: result.observation.cid })
           .catch(() => {});
       }
 

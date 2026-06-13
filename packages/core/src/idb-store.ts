@@ -72,6 +72,13 @@ export class IdbObservationStore implements ObservationStore {
     return result as Uint8Array | undefined;
   }
 
+  async listSnapshotCids(): Promise<string[]> {
+    const db = await this.open();
+    const tx = db.transaction(SNAPSHOTS, "readonly");
+    const keys = await reqToPromise(tx.objectStore(SNAPSHOTS).getAllKeys());
+    return keys as string[];
+  }
+
   async putObservation(obs: Observation): Promise<void> {
     const db = await this.open();
     const tx = db.transaction(OBSERVATIONS, "readwrite");

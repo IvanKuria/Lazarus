@@ -17,6 +17,8 @@ export interface ResurrectResult {
 export interface IndexService {
   submit(submission: Submission): Promise<void>;
   resurrectLatest(url: string): Promise<ResurrectResult | null>;
+  /** Latest promoted observation WITHOUT the blob — for P2P fetch (locate the CID). */
+  locateLatest(url: string): Promise<Observation | null>;
   listVersions(url: string): Promise<Observation[]>;
   feed(limit?: number): Promise<EditEvent[]>;
 }
@@ -36,9 +38,13 @@ export class MemoryIndexService implements IndexService {
   private readonly promotedKeys = new Set<string>(); // `urlKey\ncid` already promoted
   private readonly promoted = new Map<string, Observation[]>(); // urlKey → promoted versions
   private readonly edits: EditEvent[] = [];
+  private readonly storeBlobs: boolean;
 
-  constructor(opts: { k?: number } = {}) {
+  constructor(opts: { k?: number; storeBlobs?: boolean } = {}) {
     this.k = opts.k ?? 3;
+    // When false, the index keeps only metadata (promotion + locate) and never
+    // the blob — forcing blob retrieval through the P2P data plane.
+    this.storeBlobs = opts.storeBlobs ?? true;
   }
 
   async submit({ observation, snapshotBytes, witnessId }: Submission): Promise<void> {
@@ -47,7 +53,9 @@ export class MemoryIndexService implements IndexService {
 
     // First-write-wins is safe: the HTTP layer derives `cid` from these exact
     // bytes (computeCid), so every write for a given cid has identical content.
-    if (!this.snapshots.has(cid)) this.snapshots.set(cid, snapshotBytes);
+    if (this.storeBlobs && !this.snapshots.has(cid)) {
+      this.snapshots.set(cid, snapshotBytes);
+    }
 
     // NOTE: witnessId is currently client-supplied and therefore Sybil-spoofable
     // — an attacker could forge k distinct ids to force promotion. Hardening
@@ -98,6 +106,10 @@ export class MemoryIndexService implements IndexService {
     const snapshot = this.snapshots.get(observation.cid);
     if (!snapshot) return null;
     return { observation, snapshot };
+  }
+
+  async locateLatest(url: string): Promise<Observation | null> {
+    return this.promoted.get(normalizeUrl(url))?.at(-1) ?? null;
   }
 
   async listVersions(url: string): Promise<Observation[]> {

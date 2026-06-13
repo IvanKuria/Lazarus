@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { buildObservation } from "@lazarus/core";
 import type { IndexService } from "./index-service.js";
+import { attachSignaling } from "./signaling-ws.js";
 
 /**
  * The client submits only RAW fields. The server derives the observation
@@ -63,6 +64,14 @@ export function buildApp(service: IndexService): FastifyInstance {
     });
   });
 
+  app.get("/v1/locate", async (req, reply) => {
+    const url = (req.query as { url?: string }).url;
+    if (!url) return reply.code(400).send({ error: "url required" });
+    const observation = await service.locateLatest(url);
+    if (!observation) return reply.code(404).send({ found: false });
+    return reply.send({ observation });
+  });
+
   app.get("/v1/versions", async (req, reply) => {
     const url = (req.query as { url?: string }).url;
     if (!url) return reply.code(400).send({ error: "url required" });
@@ -73,6 +82,9 @@ export function buildApp(service: IndexService): FastifyInstance {
     const limit = Number((req.query as { limit?: string }).limit) || undefined;
     return reply.send({ edits: await service.feed(limit) });
   });
+
+  // P2P signaling lives on the same server, at /signal.
+  attachSignaling(app.server);
 
   return app;
 }
