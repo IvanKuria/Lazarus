@@ -1,0 +1,29 @@
+{
+  "name": "@lazarus/extension",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Lazarus browser extension — the node in the distributed web-memory network.",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "zip": "wxt zip",
+    "compile": "wxt prepare && tsc --noEmit",
+    "prepare": "wxt prepare"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@wxt-dev/module-react": "^1.2.2",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.16",
+    "wxt": "^0.20.26"
+  },
+  "dependencies": {
+    "@lazarus/core": "workspace:*",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

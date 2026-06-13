@@ -1,0 +1,19 @@
+{
+  "name": "lazarus",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Lazarus — the distributed memory & integrity network for the web",
+  "type": "module",
+  "scripts": {
+    "test": "pnpm -r test",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
+  "packageManager": "pnpm@10.30.3"
+}
