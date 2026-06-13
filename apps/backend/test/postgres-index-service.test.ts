@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { newDb } from "pg-mem";
 import { PostgresIndexService } from "../src/postgres-index-service.js";
+import type { BlobStore } from "../src/blob-store.js";
 import { buildObservation } from "@lazarus/core";
 
 async function makeService(opts: { k?: number; storeBlobs?: boolean } = {}) {
@@ -61,6 +62,31 @@ describe("PostgresIndexService (pg-mem)", () => {
     expect(await svc.resurrectLatest("https://x.com/p")).toBeNull(); // no blob
     const located = await svc.locateLatest("https://x.com/p");
     expect(located?.cid).toBe(s.observation.cid);
+  });
+
+  it("delegates blob storage to an injected BlobStore", async () => {
+    const blobs = new Map<string, Uint8Array>();
+    const spy: BlobStore = {
+      async migrate() {},
+      async put(cid, bytes) {
+        blobs.set(cid, bytes);
+      },
+      async get(cid) {
+        return blobs.get(cid) ?? null;
+      },
+    };
+    const db = newDb();
+    const { Pool } = db.adapters.createPg();
+    const svc = new PostgresIndexService(new Pool(), { k: 1, blobStore: spy });
+    await svc.migrate();
+
+    const s = await sub("https://x.com/a", "<h1>hi</h1>", TEXT, 1);
+    await svc.submit({ ...s, witnessId: "w1" });
+
+    // The blob went through the injected store, not an inlined snapshots INSERT.
+    expect(blobs.has(s.observation.cid)).toBe(true);
+    const r = await svc.resurrectLatest("https://x.com/a");
+    expect(new TextDecoder().decode(r!.snapshot)).toBe("<h1>hi</h1>");
   });
 
   it("lists promoted versions and emits an edit on change", async () => {

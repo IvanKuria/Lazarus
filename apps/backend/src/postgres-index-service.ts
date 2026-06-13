@@ -2,25 +2,33 @@ import type { Pool } from "pg";
 import { normalizeUrl, classifyChange, hammingDistance } from "@lazarus/core";
 import type { Observation, EditEvent } from "@lazarus/core";
 import type { IndexService, Submission, ResurrectResult } from "./index-service.js";
+import { PostgresBlobStore, type BlobStore } from "./blob-store.js";
 
 /**
  * Postgres-backed index. Same k-anonymity + content-addressing contract as
- * MemoryIndexService, durable across restarts. Snapshots are stored base64 for
- * portability; a production variant would use bytea + object storage for blobs.
+ * MemoryIndexService, durable across restarts. Snapshot bytes live behind a
+ * BlobStore (Postgres by default, S3-compatible object storage in production) so the index tables stay
+ * metadata-only; pass `storeBlobs: false` for a metadata-only node with no blob
+ * retrieval (blobs then come via the P2P data plane).
  *
  * Tested in-process against pg-mem (a Postgres emulator) and runs against the
  * real Postgres from docker-compose when DATABASE_URL is set.
  */
 export class PostgresIndexService implements IndexService {
   private readonly k: number;
-  private readonly storeBlobs: boolean;
+  private readonly blobs: BlobStore | null;
 
   constructor(
     private readonly pool: Pool,
-    opts: { k?: number; storeBlobs?: boolean } = {},
+    opts: { k?: number; storeBlobs?: boolean; blobStore?: BlobStore } = {},
   ) {
     this.k = opts.k ?? 3;
-    this.storeBlobs = opts.storeBlobs ?? true;
+    // storeBlobs:false → metadata-only node (no blob store at all). Otherwise use
+    // the injected store, defaulting to Postgres so existing callers are unchanged.
+    this.blobs =
+      opts.storeBlobs === false
+        ? null
+        : (opts.blobStore ?? new PostgresBlobStore(pool));
   }
 
   async migrate(): Promise<void> {
@@ -31,9 +39,7 @@ export class PostgresIndexService implements IndexService {
         promoted boolean NOT NULL DEFAULT false,
         PRIMARY KEY (urlkey, cid)
       )`);
-    await this.pool.query(
-      `CREATE TABLE IF NOT EXISTS snapshots (cid text PRIMARY KEY, b64 text NOT NULL)`,
-    );
+    await this.blobs?.migrate();
     await this.pool.query(`
       CREATE TABLE IF NOT EXISTS witnesses (
         urlkey text NOT NULL, cid text NOT NULL, witness text NOT NULL,
@@ -55,12 +61,7 @@ export class PostgresIndexService implements IndexService {
        VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT (urlkey,cid) DO NOTHING`,
       [urlKey, cid, fingerprint, capturedAt, sizeBytes, title ?? null],
     );
-    if (this.storeBlobs) {
-      await this.pool.query(
-        `INSERT INTO snapshots(cid,b64) VALUES($1,$2) ON CONFLICT (cid) DO NOTHING`,
-        [cid, Buffer.from(snapshotBytes).toString("base64")],
-      );
-    }
+    await this.blobs?.put(cid, snapshotBytes);
     await this.pool.query(
       `INSERT INTO witnesses(urlkey,cid,witness) VALUES($1,$2,$3)
        ON CONFLICT (urlkey,cid,witness) DO NOTHING`,
@@ -116,18 +117,17 @@ export class PostgresIndexService implements IndexService {
   }
 
   async resurrectLatest(url: string): Promise<ResurrectResult | null> {
+    if (!this.blobs) return null;
     const res = await this.pool.query(
-      `SELECT o.urlkey,o.cid,o.fingerprint,o.captured_at,o.size_bytes,o.title,s.b64
-       FROM observations o LEFT JOIN snapshots s ON s.cid=o.cid
-       WHERE o.urlkey=$1 AND o.promoted=true ORDER BY o.captured_at DESC LIMIT 1`,
+      `SELECT urlkey,cid,fingerprint,captured_at,size_bytes,title FROM observations
+       WHERE urlkey=$1 AND promoted=true ORDER BY captured_at DESC LIMIT 1`,
       [normalizeUrl(url)],
     );
     const row = res.rows[0];
-    if (!row || row.b64 == null) return null;
-    return {
-      observation: rowToObservation(row),
-      snapshot: new Uint8Array(Buffer.from(row.b64, "base64")),
-    };
+    if (!row) return null;
+    const snapshot = await this.blobs.get(row.cid as string);
+    if (!snapshot) return null;
+    return { observation: rowToObservation(row), snapshot };
   }
 
   async locateLatest(url: string): Promise<Observation | null> {
