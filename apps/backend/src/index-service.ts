@@ -45,7 +45,14 @@ export class MemoryIndexService implements IndexService {
     const { urlKey, cid } = observation;
     const key = `${urlKey}\n${cid}`;
 
+    // First-write-wins is safe: the HTTP layer derives `cid` from these exact
+    // bytes (computeCid), so every write for a given cid has identical content.
     if (!this.snapshots.has(cid)) this.snapshots.set(cid, snapshotBytes);
+
+    // NOTE: witnessId is currently client-supplied and therefore Sybil-spoofable
+    // — an attacker could forge k distinct ids to force promotion. Hardening
+    // (install attestation / server-issued rotating tokens / PoW) is the tracked
+    // Sybil-resistance axis; not yet enforced.
 
     let seen = this.witnesses.get(key);
     if (!seen) {

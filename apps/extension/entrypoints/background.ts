@@ -13,6 +13,8 @@ import type {
   SnapshotResponse,
   FeedResponse,
 } from "../lib/protocol.js";
+import { IndexClient } from "../lib/index-client.js";
+import { getWitnessId } from "../lib/witness.js";
 
 /**
  * Service worker — the thin coordinator. Owns the single extension-origin store,
@@ -21,6 +23,7 @@ import type {
  */
 export default defineBackground(() => {
   const store = new IdbObservationStore("lazarus");
+  const index = new IndexClient();
 
   // tabId → status code of the most recent main-frame response in that tab.
   const mainFrameStatus = new Map<number, number>();
@@ -78,18 +81,32 @@ export default defineBackground(() => {
       const tabId = sender.tab?.id;
       const status = tabId !== undefined ? mainFrameStatus.get(tabId) : undefined;
 
-      // Dead page: don't capture the error page; offer a preserved copy instead.
+      // Dead page: don't capture the error page; offer a preserved copy. Try the
+      // local store first, then the shared index (what another browser saw).
       if (status !== undefined && status >= 400) {
-        const hit = await resurrect(store, page.url);
-        if (!hit) return { recorded: false };
+        const local = await resurrect(store, page.url);
+        if (local) {
+          return {
+            recorded: false,
+            resurrect: {
+              html: new TextDecoder().decode(local.snapshot),
+              ...(local.observation.title !== undefined && {
+                title: local.observation.title,
+              }),
+              capturedAt: local.observation.capturedAt,
+            },
+          };
+        }
+        const remote = await index.resurrectLatest(page.url).catch(() => null);
+        if (!remote) return { recorded: false };
         return {
           recorded: false,
           resurrect: {
-            html: new TextDecoder().decode(hit.snapshot),
-            ...(hit.observation.title !== undefined && {
-              title: hit.observation.title,
+            html: remote.html,
+            ...(remote.observation.title !== undefined && {
+              title: remote.observation.title,
             }),
-            capturedAt: hit.observation.capturedAt,
+            capturedAt: remote.observation.capturedAt,
           },
         };
       }
@@ -106,6 +123,24 @@ export default defineBackground(() => {
       console.log(
         `[lazarus] ${result.change}: ${result.observation.urlKey} (${result.observation.sizeBytes}B)`,
       );
+
+      // Contribute new/changed versions to the shared index (best-effort).
+      // Sends raw fields; the server derives the content address from the bytes.
+      if (result.change !== "unchanged") {
+        void getWitnessId()
+          .then((witnessId) =>
+            index.submit({
+              url: page.url,
+              snapshotBytes,
+              text: page.text,
+              capturedAt: page.capturedAt,
+              title: page.title,
+              witnessId,
+            }),
+          )
+          .catch(() => {});
+      }
+
       return { recorded: true };
     },
   );

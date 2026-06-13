@@ -1,21 +1,21 @@
 import { describe, it, expect } from "vitest";
 import { buildApp } from "../src/app.js";
 import { MemoryIndexService } from "../src/index-service.js";
-import { buildObservation } from "@lazarus/core";
 
 const bytes = (s: string) => new TextEncoder().encode(s);
 const b64 = (u: Uint8Array) => Buffer.from(u).toString("base64");
 
-async function submissionBody(url: string, body: string, witnessId: string) {
-  const snapshotBytes = bytes(body);
-  const observation = await buildObservation({
+// The server derives the observation (cid/urlKey/fingerprint) from these raw
+// fields — clients never supply content-addressing fields.
+function submissionBody(url: string, body: string, witnessId: string) {
+  return {
     url,
-    snapshotBytes,
+    snapshotBase64: b64(bytes(body)),
     text: "content long enough to fingerprint meaningfully for the test here",
     capturedAt: 1,
     title: "T",
-  });
-  return { observation, snapshotBase64: b64(snapshotBytes), witnessId };
+    witnessId,
+  };
 }
 
 describe("index HTTP API", () => {

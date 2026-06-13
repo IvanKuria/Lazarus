@@ -15,6 +15,7 @@
     "prepare": "wxt prepare"
   },
   "devDependencies": {
+    "@lazarus/backend": "workspace:*",
     "@playwright/test": "^1.60.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",

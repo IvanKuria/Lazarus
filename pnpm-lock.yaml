@@ -42,6 +42,9 @@ importers:
         specifier: ^19.2.7
         version: 19.2.7(react@19.2.7)
     devDependencies:
+      '@lazarus/backend':
+        specifier: workspace:*
+        version: link:../backend
       '@playwright/test':
         specifier: ^1.60.0
         version: 1.60.0
