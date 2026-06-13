@@ -12,6 +12,7 @@ export { resurrect } from "./resurrect.js";
 export type { ResurrectResult } from "./resurrect.js";
 export { listVersions } from "./versions.js";
 export { getEditFeed } from "./feed.js";
+export { splitChunks, BlobAssembler, CHUNK_SIZE } from "./chunk.js";
 export { MemoryObservationStore } from "./store.js";
 export { IdbObservationStore } from "./idb-store.js";
 export type { ObservationStore, RecordResult } from "./store.js";
