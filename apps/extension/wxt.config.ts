@@ -13,6 +13,8 @@ export default defineConfig({
     // offscreen: long-lived WebRTC host (later phases).
     // webRequest/webNavigation: detect dead main-frame loads (4xx/5xx + network
     //   errors) to gate capture and trigger Resurrection.
+    // history: the "Digital Mortality" scan reads your past URLs to measure how
+    //   many are already dead (checked locally; nothing leaves the device).
     permissions: [
       "storage",
       "unlimitedStorage",
@@ -20,6 +22,7 @@ export default defineConfig({
       "offscreen",
       "webRequest",
       "webNavigation",
+      "history",
     ],
     // Broad host access is required to capture + inline subresources across sites.
     // This surfaces the "read your data" warning — a known, accepted tradeoff.

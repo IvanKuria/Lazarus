@@ -13,19 +13,23 @@ const page = (title, bodyHtml) =>
 <body style="font:18px/1.6 system-ui,sans-serif;max-width:680px;margin:48px auto;padding:0 16px;color:#1f2937">
 ${bodyHtml}</body></html>`;
 
+const LOGO = `<p><img src="http://demo.lazarus.test/logo.svg" width="160" height="60" alt="Lazarus logo"></p>`;
+
 const V1 = page(
   "The Quiet Announcement",
-  `<h1>The Quiet Announcement</h1>
+  `<h1>The Quiet Announcement</h1>${LOGO}
    <p><b>Version 1.</b> The committee said the budget is <b>on track</b> for the Q3 launch.</p>
    <p>This is the original article text that Lazarus preserved. marker-ORIGINAL.</p>`,
 );
 
 const V2 = page(
   "The Quiet Announcement",
-  `<h1>The Quiet Announcement</h1>
+  `<h1>The Quiet Announcement</h1>${LOGO}
    <p><b>Version 2.</b> The committee now says the budget is <b>delayed to Q4</b> after scope changes.</p>
    <p>This paragraph was quietly added in the edit — Lazarus caught the change. marker-EDITED.</p>`,
 );
+
+const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="60"><rect width="160" height="60" rx="8" fill="#7c3aed"/><text x="80" y="38" font-family="system-ui,sans-serif" font-size="22" fill="#fff" text-anchor="middle">LAZARUS</text></svg>`;
 
 const DEAD = page("404 Not Found", `<h1>404 — Not Found</h1><p>This page is gone.</p>`);
 
@@ -65,6 +69,10 @@ http
       if (m === "live" || m === "edited" || m === "dead") mode = m;
       res.writeHead(302, { Location: "/" });
       return res.end();
+    }
+    if (url.pathname === "/logo.svg") {
+      res.writeHead(200, { "content-type": "image/svg+xml" });
+      return res.end(LOGO_SVG);
     }
     if (url.pathname === "/article") {
       if (mode === "dead") {

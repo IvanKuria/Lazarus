@@ -5,6 +5,8 @@ import {
   getEditFeed,
   shouldCapture,
   inlineResources,
+  sampleLinks,
+  summarizeMortality,
   IdbObservationStore,
 } from "@lazarus/core";
 import type {
@@ -13,7 +15,9 @@ import type {
   VersionsResponse,
   SnapshotResponse,
   FeedResponse,
+  MortalityResponse,
 } from "../lib/protocol.js";
+import { scanMortality } from "../lib/mortality-scan.js";
 import { IndexClient } from "../lib/index-client.js";
 import { getWitnessId } from "../lib/witness.js";
 import { base64ToBytes, bytesToBase64 } from "../lib/base64.js";
@@ -51,6 +55,13 @@ async function inlineSnapshot(html: string, urls: string[]): Promise<string> {
 export default defineBackground(() => {
   const store = new IdbObservationStore("lazarus");
   const index = new IndexClient();
+
+  // Show the "Digital Mortality" onboarding on first install.
+  browser.runtime.onInstalled.addListener((details) => {
+    if (details.reason === "install") {
+      void browser.tabs.create({ url: browser.runtime.getURL("/onboarding.html") });
+    }
+  });
 
   // Stand up the long-lived offscreen document that hosts P2P (WebRTC).
   // chrome.offscreen typings vary across builds, so access it untyped.
@@ -126,8 +137,13 @@ export default defineBackground(() => {
       | VersionsResponse
       | SnapshotResponse
       | FeedResponse
+      | MortalityResponse
       | undefined
     > => {
+      if (message?.type === "lazarus:mortality") {
+        return scanMortality(message.sample ?? 60);
+      }
+
       if (message?.type === "lazarus:feed") {
         return { edits: await getEditFeed(store, message.limit ?? 50) };
       }

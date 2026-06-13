@@ -1,4 +1,4 @@
-import type { Observation, EditEvent } from "@lazarus/core";
+import type { Observation, EditEvent, MortalitySummary } from "@lazarus/core";
 
 /** Message contract between extension contexts (content script ⇄ background). */
 
@@ -61,8 +61,21 @@ export interface FeedResponse {
   edits: EditEvent[];
 }
 
+/** Run the "Digital Mortality" scan over the user's history (local only). */
+export interface MortalityMessage {
+  type: "lazarus:mortality";
+  /** How many recent history links to sample. */
+  sample?: number;
+}
+
+export interface MortalityResponse extends MortalitySummary {
+  /** A few example dead links, for display. */
+  examples: string[];
+}
+
 export type LazarusMessage =
   | CaptureMessage
   | VersionsMessage
   | SnapshotMessage
-  | FeedMessage;
+  | FeedMessage
+  | MortalityMessage;
