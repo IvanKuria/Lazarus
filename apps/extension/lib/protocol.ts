@@ -1,3 +1,5 @@
+import type { Observation } from "@lazarus/core";
+
 /** Message contract between extension contexts (content script ⇄ background). */
 
 export interface CapturePayload {
@@ -27,4 +29,24 @@ export interface CaptureResponse {
   };
 }
 
-export type LazarusMessage = CaptureMessage;
+/** Request the full version timeline for a URL (metadata only, no blobs). */
+export interface VersionsMessage {
+  type: "lazarus:versions";
+  url: string;
+}
+
+export interface VersionsResponse {
+  versions: Observation[];
+}
+
+/** Fetch the preserved HTML for a single version by its content id. */
+export interface SnapshotMessage {
+  type: "lazarus:snapshot";
+  cid: string;
+}
+
+export interface SnapshotResponse {
+  html: string | null;
+}
+
+export type LazarusMessage = CaptureMessage | VersionsMessage | SnapshotMessage;

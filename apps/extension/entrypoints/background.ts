@@ -1,5 +1,16 @@
-import { recordCapture, resurrect, shouldCapture, IdbObservationStore } from "@lazarus/core";
-import type { CaptureMessage, CaptureResponse } from "../lib/protocol.js";
+import {
+  recordCapture,
+  resurrect,
+  listVersions,
+  shouldCapture,
+  IdbObservationStore,
+} from "@lazarus/core";
+import type {
+  LazarusMessage,
+  CaptureResponse,
+  VersionsResponse,
+  SnapshotResponse,
+} from "../lib/protocol.js";
 
 /**
  * Service worker — the thin coordinator. Owns the single extension-origin store,
@@ -35,7 +46,19 @@ export default defineBackground(() => {
   });
 
   browser.runtime.onMessage.addListener(
-    async (message: CaptureMessage, sender): Promise<CaptureResponse | undefined> => {
+    async (
+      message: LazarusMessage,
+      sender,
+    ): Promise<CaptureResponse | VersionsResponse | SnapshotResponse | undefined> => {
+      if (message?.type === "lazarus:versions") {
+        return { versions: await listVersions(store, message.url) };
+      }
+
+      if (message?.type === "lazarus:snapshot") {
+        const bytes = await store.getSnapshot(message.cid);
+        return { html: bytes ? new TextDecoder().decode(bytes) : null };
+      }
+
       if (message?.type !== "lazarus:capture") return;
       const { page } = message;
       if (!shouldCapture(page.url)) return { recorded: false };
