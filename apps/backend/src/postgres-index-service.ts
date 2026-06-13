@@ -157,6 +157,15 @@ export class PostgresIndexService implements IndexService {
         : await this.pool.query(`${base} LIMIT $1`, [limit]);
     return res.rows.map(rowToEdit);
   }
+
+  async ping(): Promise<boolean> {
+    try {
+      await this.pool.query("SELECT 1");
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 
 function rowToObservation(row: Record<string, unknown>): Observation {

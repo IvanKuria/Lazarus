@@ -21,6 +21,8 @@ export interface IndexService {
   locateLatest(url: string): Promise<Observation | null>;
   listVersions(url: string): Promise<Observation[]>;
   feed(limit?: number): Promise<EditEvent[]>;
+  /** Liveness/connectivity check for /health. */
+  ping(): Promise<boolean>;
 }
 
 /**
@@ -121,5 +123,9 @@ export class MemoryIndexService implements IndexService {
       (a, b) => b.nextCapturedAt - a.nextCapturedAt,
     );
     return limit === undefined ? sorted : sorted.slice(0, limit);
+  }
+
+  async ping(): Promise<boolean> {
+    return true;
   }
 }

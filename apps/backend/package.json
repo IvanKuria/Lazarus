@@ -21,6 +21,7 @@
     "@lazarus/core": "workspace:*",
     "fastify": "^5.8.5",
     "pg": "^8.21.0",
+    "posthog-node": "^5.37.0",
     "ws": "^8.21.0"
   },
   "devDependencies": {
