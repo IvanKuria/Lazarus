@@ -1,5 +1,5 @@
 import type { ObservationStore } from "./store.js";
-import type { Observation } from "./types.js";
+import type { Observation, EditEvent } from "./types.js";
 
 /**
  * IndexedDB-backed observation store — the extension's real persistence layer.
@@ -11,6 +11,8 @@ import type { Observation } from "./types.js";
  */
 const SNAPSHOTS = "snapshots";
 const OBSERVATIONS = "observations";
+const EDITS = "edits";
+const DB_VERSION = 2;
 
 function reqToPromise<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -35,7 +37,7 @@ export class IdbObservationStore implements ObservationStore {
   private open(): Promise<IDBDatabase> {
     if (!this.dbPromise) {
       this.dbPromise = new Promise((resolve, reject) => {
-        const req = indexedDB.open(this.name, 1);
+        const req = indexedDB.open(this.name, DB_VERSION);
         req.onupgradeneeded = () => {
           const db = req.result;
           if (!db.objectStoreNames.contains(SNAPSHOTS)) {
@@ -44,6 +46,9 @@ export class IdbObservationStore implements ObservationStore {
           if (!db.objectStoreNames.contains(OBSERVATIONS)) {
             const os = db.createObjectStore(OBSERVATIONS, { autoIncrement: true });
             os.createIndex("urlKey", "urlKey", { unique: false });
+          }
+          if (!db.objectStoreNames.contains(EDITS)) {
+            db.createObjectStore(EDITS, { autoIncrement: true });
           }
         };
         req.onsuccess = () => resolve(req.result);
@@ -84,5 +89,20 @@ export class IdbObservationStore implements ObservationStore {
 
   async getLatestObservation(urlKey: string): Promise<Observation | undefined> {
     return (await this.getTimeline(urlKey)).at(-1);
+  }
+
+  async putEdit(event: EditEvent): Promise<void> {
+    const db = await this.open();
+    const tx = db.transaction(EDITS, "readwrite");
+    tx.objectStore(EDITS).add(event);
+    await txDone(tx);
+  }
+
+  async listEdits(limit?: number): Promise<EditEvent[]> {
+    const db = await this.open();
+    const tx = db.transaction(EDITS, "readonly");
+    const all = (await reqToPromise(tx.objectStore(EDITS).getAll())) as EditEvent[];
+    all.sort((a, b) => b.nextCapturedAt - a.nextCapturedAt);
+    return limit === undefined ? all : all.slice(0, limit);
   }
 }

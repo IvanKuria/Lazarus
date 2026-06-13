@@ -1,4 +1,4 @@
-import type { Observation, ChangeKind } from "./types.js";
+import type { Observation, ChangeKind, EditEvent } from "./types.js";
 
 /** Outcome of recording a capture: what changed, and the resulting observation. */
 export interface RecordResult {
@@ -20,12 +20,17 @@ export interface ObservationStore {
   getLatestObservation(urlKey: string): Promise<Observation | undefined>;
   /** All observations for a urlKey, ordered oldest → newest. */
   getTimeline(urlKey: string): Promise<Observation[]>;
+  /** Append a detected edit to the feed log. */
+  putEdit(event: EditEvent): Promise<void>;
+  /** Recent edits, newest-first, optionally capped at `limit`. */
+  listEdits(limit?: number): Promise<EditEvent[]>;
 }
 
 /** In-memory store for tests and ephemeral use. */
 export class MemoryObservationStore implements ObservationStore {
   private readonly snapshots = new Map<string, Uint8Array>();
   private readonly timelines = new Map<string, Observation[]>();
+  private readonly edits: EditEvent[] = [];
 
   async putSnapshot(cid: string, bytes: Uint8Array): Promise<void> {
     this.snapshots.set(cid, bytes);
@@ -48,5 +53,16 @@ export class MemoryObservationStore implements ObservationStore {
 
   async getTimeline(urlKey: string): Promise<Observation[]> {
     return [...(this.timelines.get(urlKey) ?? [])];
+  }
+
+  async putEdit(event: EditEvent): Promise<void> {
+    this.edits.push(event);
+  }
+
+  async listEdits(limit?: number): Promise<EditEvent[]> {
+    const sorted = [...this.edits].sort(
+      (a, b) => b.nextCapturedAt - a.nextCapturedAt,
+    );
+    return limit === undefined ? sorted : sorted.slice(0, limit);
   }
 }

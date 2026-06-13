@@ -32,3 +32,20 @@ export interface CapturedPage {
 
 /** How a new version relates to the previous one for the same urlKey. */
 export type ChangeKind = "unchanged" | "edited" | "replaced";
+
+/**
+ * A detected change between two consecutive versions of a page — the unit of the
+ * Stealth-Edit Feed. Recorded whenever a capture supersedes a different prior
+ * version (kind "edited" or "replaced"), never for first-ever or unchanged captures.
+ */
+export interface EditEvent {
+  urlKey: string;
+  title?: string;
+  kind: Exclude<ChangeKind, "unchanged">;
+  prevCid: string;
+  nextCid: string;
+  /** SimHash Hamming distance between the two versions. */
+  distance: number;
+  prevCapturedAt: number;
+  nextCapturedAt: number;
+}

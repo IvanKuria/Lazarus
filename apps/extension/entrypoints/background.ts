@@ -2,6 +2,7 @@ import {
   recordCapture,
   resurrect,
   listVersions,
+  getEditFeed,
   shouldCapture,
   IdbObservationStore,
 } from "@lazarus/core";
@@ -10,6 +11,7 @@ import type {
   CaptureResponse,
   VersionsResponse,
   SnapshotResponse,
+  FeedResponse,
 } from "../lib/protocol.js";
 
 /**
@@ -49,7 +51,17 @@ export default defineBackground(() => {
     async (
       message: LazarusMessage,
       sender,
-    ): Promise<CaptureResponse | VersionsResponse | SnapshotResponse | undefined> => {
+    ): Promise<
+      | CaptureResponse
+      | VersionsResponse
+      | SnapshotResponse
+      | FeedResponse
+      | undefined
+    > => {
+      if (message?.type === "lazarus:feed") {
+        return { edits: await getEditFeed(store, message.limit ?? 50) };
+      }
+
       if (message?.type === "lazarus:versions") {
         return { versions: await listVersions(store, message.url) };
       }

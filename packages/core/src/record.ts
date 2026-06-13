@@ -1,4 +1,5 @@
 import { buildObservation, classifyChange } from "./observation.js";
+import { hammingDistance } from "./fingerprint.js";
 import type { ObservationStore, RecordResult } from "./store.js";
 import type { CapturedPage } from "./types.js";
 
@@ -22,6 +23,21 @@ export async function recordCapture(
   await store.putSnapshot(observation.cid, page.snapshotBytes);
   await store.putObservation(observation);
 
-  const change = latest ? classifyChange(latest, observation) : "new";
-  return { change, observation };
+  if (latest) {
+    // latest exists and cids differ → change is "edited" or "replaced".
+    const change = classifyChange(latest, observation) as "edited" | "replaced";
+    await store.putEdit({
+      urlKey: observation.urlKey,
+      ...(observation.title !== undefined && { title: observation.title }),
+      kind: change,
+      prevCid: latest.cid,
+      nextCid: observation.cid,
+      distance: hammingDistance(latest.fingerprint, observation.fingerprint),
+      prevCapturedAt: latest.capturedAt,
+      nextCapturedAt: observation.capturedAt,
+    });
+    return { change, observation };
+  }
+
+  return { change: "new", observation };
 }

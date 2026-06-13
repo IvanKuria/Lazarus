@@ -1,4 +1,4 @@
-import type { Observation } from "@lazarus/core";
+import type { Observation, EditEvent } from "@lazarus/core";
 
 /** Message contract between extension contexts (content script ⇄ background). */
 
@@ -49,4 +49,18 @@ export interface SnapshotResponse {
   html: string | null;
 }
 
-export type LazarusMessage = CaptureMessage | VersionsMessage | SnapshotMessage;
+/** Request the Stealth-Edit Feed (recent detected edits, newest-first). */
+export interface FeedMessage {
+  type: "lazarus:feed";
+  limit?: number;
+}
+
+export interface FeedResponse {
+  edits: EditEvent[];
+}
+
+export type LazarusMessage =
+  | CaptureMessage
+  | VersionsMessage
+  | SnapshotMessage
+  | FeedMessage;

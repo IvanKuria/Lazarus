@@ -14,6 +14,12 @@ const POST_V1 = `<!doctype html><html><head><title>Breaking News</title></head>
 const POST_V2 = `<!doctype html><html><head><title>Breaking News</title></head>
 <body><h1>Breaking News</h1><p>The mayor vetoed the budget instead. marker-VERSION-TWO entirely rewritten.</p></body></html>`;
 
+const MEMO_V1 = `<!doctype html><html><head><title>Project Memo</title></head>
+<body><h1>Project Memo</h1><p>Status: on track for the Q3 launch. memo-original baseline text.</p></body></html>`;
+const MEMO_V2 = `<!doctype html><html><head><title>Project Memo</title></head>
+<body><h1>Project Memo</h1><p>Status: quietly delayed to Q4 after scope changes. memo-revised replacement text entirely.</p></body></html>`;
+let memoVersion: 1 | 2 = 1;
+
 // The test server flips between serving the article (200) and a 404.
 let mode: "live" | "dead" = "live";
 // And serves two distinct versions of /post for the Scrubber test.
@@ -37,6 +43,11 @@ test.beforeAll(async () => {
     if (req.url?.startsWith("/post")) {
       res.writeHead(200, { "content-type": "text/html" });
       res.end(postVersion === 1 ? POST_V1 : POST_V2);
+      return;
+    }
+    if (req.url?.startsWith("/memo")) {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(memoVersion === 1 ? MEMO_V1 : MEMO_V2);
       return;
     }
     res.writeHead(404);
@@ -126,4 +137,25 @@ test("scrubs back to an earlier version of a changed page", async () => {
   await expect(frame.getByText("marker-VERSION-ONE")).toBeVisible({
     timeout: 10_000,
   });
+});
+
+test("surfaces a stealth edit in the popup feed", async () => {
+  const page = await context.newPage();
+
+  // Capture the memo, then capture a quietly-changed version.
+  memoVersion = 1;
+  await page.goto("http://news.example.com/memo", { waitUntil: "networkidle" });
+  await page.waitForTimeout(2500);
+  memoVersion = 2;
+  await page.goto("http://news.example.com/memo", { waitUntil: "networkidle" });
+  await page.waitForTimeout(2500);
+
+  // Open the real extension popup and assert the edit shows up.
+  const sw = context.serviceWorkers()[0];
+  const extId = new URL(sw!.url()).host;
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extId}/popup.html`);
+
+  await expect(popup.getByText("Project Memo")).toBeVisible({ timeout: 10_000 });
+  await expect(popup.getByText(/edited|replaced/i).first()).toBeVisible();
 });

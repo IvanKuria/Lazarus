@@ -54,4 +54,30 @@ describe("IdbObservationStore", () => {
     const timeline = await b.getTimeline("https://example.com/a");
     expect(timeline.map((o) => o.cid)).toEqual(["persisted"]);
   });
+
+  it("stores and lists edits newest-first with a limit", async () => {
+    const store = new IdbObservationStore(freshDb());
+    await store.putEdit({
+      urlKey: "https://example.com/a",
+      kind: "edited",
+      prevCid: "p1",
+      nextCid: "n1",
+      distance: 2,
+      prevCapturedAt: 1,
+      nextCapturedAt: 10,
+    });
+    await store.putEdit({
+      urlKey: "https://example.com/b",
+      kind: "replaced",
+      prevCid: "p2",
+      nextCid: "n2",
+      distance: 40,
+      prevCapturedAt: 5,
+      nextCapturedAt: 20,
+    });
+
+    const feed = await store.listEdits();
+    expect(feed.map((e) => e.nextCapturedAt)).toEqual([20, 10]);
+    expect(await store.listEdits(1)).toHaveLength(1);
+  });
 });
