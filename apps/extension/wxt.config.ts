@@ -11,7 +11,16 @@ export default defineConfig({
     // storage/unlimitedStorage: GB-scale local snapshot store (IndexedDB/OPFS).
     // alarms: keep-alive watchdog for the offscreen P2P document (later phases).
     // offscreen: long-lived WebRTC host (later phases).
-    permissions: ["storage", "unlimitedStorage", "alarms", "offscreen"],
+    // webRequest/webNavigation: detect dead main-frame loads (4xx/5xx + network
+    //   errors) to gate capture and trigger Resurrection.
+    permissions: [
+      "storage",
+      "unlimitedStorage",
+      "alarms",
+      "offscreen",
+      "webRequest",
+      "webNavigation",
+    ],
     // Broad host access is required to capture + inline subresources across sites.
     // This surfaces the "read your data" warning — a known, accepted tradeoff.
     host_permissions: ["<all_urls>"],
