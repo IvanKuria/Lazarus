@@ -7,7 +7,14 @@ const dir = path.dirname(fileURLToPath(import.meta.url));
 const EXT_PATH = path.resolve(dir, "../.output/chrome-mv3");
 
 const ARTICLE_HTML = `<!doctype html><html><head><title>The Original Article</title></head>
-<body><h1>The Original Article</h1><p>unique-marker-A1B2C3</p></body></html>`;
+<body><h1>The Original Article</h1><p>unique-marker-A1B2C3</p>
+<img src="http://news.example.com/logo.png" alt="logo"></body></html>`;
+
+// A 1x1 PNG, served so the background can fetch + inline it as a data URI.
+const PNG_1x1 = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "base64",
+);
 
 const POST_V1 = `<!doctype html><html><head><title>Breaking News</title></head>
 <body><h1>Breaking News</h1><p>The mayor approved the budget. marker-VERSION-ONE.</p></body></html>`;
@@ -48,6 +55,11 @@ test.beforeAll(async () => {
     if (req.url?.startsWith("/memo")) {
       res.writeHead(200, { "content-type": "text/html" });
       res.end(memoVersion === 1 ? MEMO_V1 : MEMO_V2);
+      return;
+    }
+    if (req.url?.startsWith("/logo.png")) {
+      res.writeHead(200, { "content-type": "image/png" });
+      res.end(PNG_1x1);
       return;
     }
     res.writeHead(404);
@@ -104,6 +116,9 @@ test("captures a live page, then resurrects it once it 404s", async () => {
   await expect(preserved.getByText("unique-marker-A1B2C3")).toBeVisible({
     timeout: 10_000,
   });
+  // Fidelity: the image was inlined at capture, so it's a data: URI that
+  // survives even though the page (and its image) are now 404.
+  await expect(preserved.locator("img")).toHaveAttribute("src", /^data:image\/png/);
 });
 
 test("scrubs back to an earlier version of a changed page", async () => {

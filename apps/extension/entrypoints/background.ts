@@ -4,6 +4,7 @@ import {
   listVersions,
   getEditFeed,
   shouldCapture,
+  inlineResources,
   IdbObservationStore,
 } from "@lazarus/core";
 import type {
@@ -15,7 +16,32 @@ import type {
 } from "../lib/protocol.js";
 import { IndexClient } from "../lib/index-client.js";
 import { getWitnessId } from "../lib/witness.js";
-import { base64ToBytes } from "../lib/base64.js";
+import { base64ToBytes, bytesToBase64 } from "../lib/base64.js";
+
+/** Fetch the collected resources (host permissions bypass page CORS) and inline
+ * them as data URIs, making the snapshot self-contained. */
+const MAX_RESOURCES = 60;
+const MAX_RESOURCE_BYTES = 3 * 1024 * 1024;
+
+async function inlineSnapshot(html: string, urls: string[]): Promise<string> {
+  const map: Record<string, string> = {};
+  await Promise.all(
+    urls.slice(0, MAX_RESOURCES).map(async (url) => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const blob = await res.blob();
+        if (blob.size > MAX_RESOURCE_BYTES) return;
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        const type = blob.type || "application/octet-stream";
+        map[url] = `data:${type};base64,${bytesToBase64(bytes)}`;
+      } catch {
+        /* skip unreachable resource */
+      }
+    }),
+  );
+  return inlineResources(html, map);
+}
 
 /**
  * Service worker — the thin coordinator. Owns the single extension-origin store,
@@ -161,8 +187,9 @@ export default defineBackground(() => {
         return { recorded: false };
       }
 
-      // Live page: record it.
-      const snapshotBytes = new TextEncoder().encode(page.html);
+      // Live page: inline its resources, then record the self-contained snapshot.
+      const inlinedHtml = await inlineSnapshot(page.html, page.resourceUrls ?? []);
+      const snapshotBytes = new TextEncoder().encode(inlinedHtml);
       const result = await recordCapture(store, {
         url: page.url,
         snapshotBytes,

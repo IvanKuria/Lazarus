@@ -8,6 +8,8 @@ export interface CapturePayload {
   text: string;
   title: string;
   capturedAt: number;
+  /** Absolute image URLs for the background to fetch + inline as data URIs. */
+  resourceUrls: string[];
 }
 
 export interface CaptureMessage {

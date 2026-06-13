@@ -7,6 +7,7 @@ import type {
   SnapshotMessage,
   SnapshotResponse,
 } from "../lib/protocol.js";
+import { captureDom } from "../lib/capture.js";
 import { showResurrectionOverlay } from "../lib/resurrection-overlay.js";
 import { showScrubber } from "../lib/scrubber-overlay.js";
 
@@ -25,14 +26,16 @@ export default defineContentScript({
   async main() {
     if (!shouldCapture(location.href)) return;
     try {
+      const captured = captureDom(document);
       const captureMsg: CaptureMessage = {
         type: "lazarus:capture",
         page: {
           url: location.href,
-          html: document.documentElement.outerHTML,
-          text: document.body?.innerText ?? "",
+          html: captured.html,
+          text: captured.text,
           title: document.title,
           capturedAt: Date.now(),
+          resourceUrls: captured.resourceUrls,
         },
       };
       const capture = (await browser.runtime.sendMessage(captureMsg)) as
