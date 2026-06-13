@@ -21,7 +21,7 @@ import type {
 } from "../lib/protocol.js";
 import { scanMortality } from "../lib/mortality-scan.js";
 import { IndexClient } from "../lib/index-client.js";
-import { getWitnessId } from "../lib/witness.js";
+import { getWitnessToken } from "../lib/witness.js";
 import { base64ToBytes, bytesToBase64 } from "../lib/base64.js";
 
 /** Fetch the collected resources (host permissions bypass page CORS) and inline
@@ -241,15 +241,15 @@ export default defineBackground(() => {
       // Contribute new/changed versions to the shared index (best-effort).
       // Sends raw fields; the server derives the content address from the bytes.
       if (result.change !== "unchanged") {
-        void getWitnessId()
-          .then((witnessId) =>
+        void getWitnessToken(index)
+          .then((witnessToken) =>
             index.submit({
               url: page.url,
               snapshotBytes,
               text: page.text,
               capturedAt: page.capturedAt,
               title: page.title,
-              witnessId,
+              witnessToken,
             }),
           )
           .catch(() => {});

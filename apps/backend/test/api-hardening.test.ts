@@ -93,7 +93,7 @@ describe("Sybil-resistant witness tokens", () => {
     await app.close();
   });
 
-  it("dual-accepts a legacy witnessId during migration", async () => {
+  it("rejects a legacy witnessId-only submission (token now required)", async () => {
     const app = buildApp(new MemoryIndexService({ k: 1 }), {
       witnessSecret: "test-secret",
     });
@@ -102,12 +102,12 @@ describe("Sybil-resistant witness tokens", () => {
       url: "/v1/observations",
       payload: { ...rawBody("https://x.com/d", "<h1>x</h1>"), witnessId: "legacy-1" },
     });
-    expect(res.statusCode).toBe(202);
-    const hit = await app.inject({
+    expect(res.statusCode).toBe(400); // no witnessToken → invalid submission
+    const miss = await app.inject({
       method: "GET",
       url: "/v1/resurrect?url=" + encodeURIComponent("https://x.com/d"),
     });
-    expect(hit.statusCode).toBe(200);
+    expect(miss.statusCode).toBe(404);
     await app.close();
   });
 
@@ -137,12 +137,12 @@ describe("GET /v1/blob?cid= (cid-addressed historical blobs)", () => {
     });
 
     // one witness → cid exists but NOT promoted → blob withheld
-    await app.inject({ method: "POST", url: "/v1/observations", payload: { ...body, witnessId: "w1" } });
+    await app.inject({ method: "POST", url: "/v1/observations", payload: { ...body, witnessToken: await mint(app) } });
     const early = await app.inject({ method: "GET", url: "/v1/blob?cid=" + cid });
     expect(early.statusCode).toBe(404);
 
     // second witness → promoted → blob served
-    await app.inject({ method: "POST", url: "/v1/observations", payload: { ...body, witnessId: "w2" } });
+    await app.inject({ method: "POST", url: "/v1/observations", payload: { ...body, witnessToken: await mint(app) } });
     const ok = await app.inject({ method: "GET", url: "/v1/blob?cid=" + cid });
     expect(ok.statusCode).toBe(200);
     expect(Buffer.from(ok.json().snapshotBase64, "base64").toString()).toBe(html);
@@ -179,7 +179,7 @@ describe("operability endpoints", () => {
     await app.inject({
       method: "POST",
       url: "/v1/observations",
-      payload: { ...rawBody("https://x.com/m", "<h1>x</h1>"), witnessId: "w1" },
+      payload: { ...rawBody("https://x.com/m", "<h1>x</h1>"), witnessToken: await mint(app) },
     });
     const res = await app.inject({ method: "GET", url: "/metrics" });
     expect(res.statusCode).toBe(200);
@@ -196,7 +196,7 @@ describe("operability endpoints", () => {
     await app.inject({
       method: "POST",
       url: "/v1/observations",
-      payload: { ...rawBody("https://secret.example/path", "<h1>x</h1>"), witnessId: "w1" },
+      payload: { ...rawBody("https://secret.example/path", "<h1>x</h1>"), witnessToken: await mint(app) },
     });
     expect(events.some((e) => e.event === "observation_submitted")).toBe(true);
     const serialized = JSON.stringify(events);

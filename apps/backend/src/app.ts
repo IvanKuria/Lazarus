@@ -14,8 +14,7 @@ import { buildIceServers, type TurnConfig } from "./turn-config.js";
  *
  * The witness identity is taken from a server-issued `witnessToken` (the `wid`
  * inside it), NOT a client-chosen string — that's what makes k-anonymity
- * Sybil-resistant. A legacy client-chosen `witnessId` is still accepted during
- * migration (dual-accept) so older builds keep working.
+ * Sybil-resistant. A token is required (mint one at POST /v1/witness).
  */
 interface SubmitBody {
   url: string;
@@ -23,21 +22,19 @@ interface SubmitBody {
   text: string;
   capturedAt: number;
   title?: string;
-  witnessToken?: string;
-  witnessId?: string;
+  witnessToken: string;
 }
 
 function isValidSubmit(b: unknown): b is SubmitBody {
   const x = b as Partial<SubmitBody>;
-  const base =
+  return (
     typeof x?.url === "string" &&
     typeof x?.snapshotBase64 === "string" &&
     typeof x?.text === "string" &&
     typeof x?.capturedAt === "number" &&
-    (x.title === undefined || typeof x.title === "string");
-  const hasWitness =
-    typeof x?.witnessToken === "string" || typeof x?.witnessId === "string";
-  return base && hasWitness;
+    typeof x?.witnessToken === "string" &&
+    (x.title === undefined || typeof x.title === "string")
+  );
 }
 
 export interface BuildOpts {
@@ -100,22 +97,14 @@ export function buildApp(service: IndexService, opts: BuildOpts = {}): FastifyIn
     }
     const body = req.body;
 
-    // Resolve the witness identity. Prefer the signed token (wid is server-issued
-    // and unforgeable); fall back to a legacy client-chosen id during migration.
-    let witnessId: string;
-    if (typeof body.witnessToken === "string") {
-      const verified = verifyToken(body.witnessToken, witnessSecret);
-      if (!verified) {
-        metrics.badTokens++;
-        return reply.code(401).send({ error: "invalid witness token" });
-      }
-      witnessId = verified.wid;
-    } else if (typeof body.witnessId === "string") {
-      req.log?.warn?.("legacy witnessId submission (no token)");
-      witnessId = body.witnessId;
-    } else {
-      return reply.code(400).send({ error: "invalid submission" });
+    // The witness identity is the server-issued `wid` inside the signed token —
+    // never a client-chosen value. A forged/expired token is rejected.
+    const verified = verifyToken(body.witnessToken, witnessSecret);
+    if (!verified) {
+      metrics.badTokens++;
+      return reply.code(401).send({ error: "invalid witness token" });
     }
+    const witnessId = verified.wid;
 
     const snapshotBytes = new Uint8Array(Buffer.from(body.snapshotBase64, "base64"));
     // Derive the observation server-side from the bytes — do not trust the client.

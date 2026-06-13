@@ -24,7 +24,9 @@ export class IndexClient {
     text: string;
     capturedAt: number;
     title?: string;
-    witnessId: string;
+    /** Server-issued witness token (Sybil-resistant); the server derives the
+     *  witness identity from it, not from any client-chosen value. */
+    witnessToken: string;
   }): Promise<void> {
     // Send only raw fields; the server derives the content address from the bytes.
     await fetch(`${this.base}/v1/observations`, {
@@ -36,9 +38,31 @@ export class IndexClient {
         text: params.text,
         capturedAt: params.capturedAt,
         ...(params.title !== undefined && { title: params.title }),
-        witnessId: params.witnessId,
+        witnessToken: params.witnessToken,
       }),
     });
+  }
+
+  /** Mint a short-lived, server-signed witness token (rate-limited per IP). */
+  async mintWitnessToken(): Promise<{ token: string; expiresInMs: number }> {
+    const res = await fetch(`${this.base}/v1/witness`, { method: "POST" });
+    if (!res.ok) throw new Error(`witness mint failed: ${res.status}`);
+    return (await res.json()) as { token: string; expiresInMs: number };
+  }
+
+  /** ICE servers for WebRTC: public STUN always, ephemeral TURN when configured.
+   *  Falls back to public STUN if the backend is unreachable. */
+  async getIceServers(): Promise<RTCIceServer[]> {
+    try {
+      const res = await fetch(`${this.base}/v1/turn-credentials`);
+      if (res.ok) {
+        const data = (await res.json()) as { iceServers: RTCIceServer[] };
+        if (data.iceServers?.length) return data.iceServers;
+      }
+    } catch {
+      /* fall through to STUN-only default */
+    }
+    return [{ urls: ["stun:stun.l.google.com:19302"] }];
   }
 
   /** Resolve the latest promoted observation (CID + metadata) without the blob. */

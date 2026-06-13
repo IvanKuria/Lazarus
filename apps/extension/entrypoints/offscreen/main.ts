@@ -1,6 +1,7 @@
 import { browser } from "wxt/browser";
 import { IdbObservationStore, splitChunks, BlobAssembler } from "@lazarus/core";
 import { SignalingClient, type Signal } from "../../lib/signaling-client.js";
+import { IndexClient } from "../../lib/index-client.js";
 import { bytesToBase64 } from "../../lib/base64.js";
 
 /**
@@ -16,6 +17,21 @@ const HIGH_WATER = 8 * 1024 * 1024;
 const peerId = crypto.randomUUID();
 const store = new IdbObservationStore("lazarus");
 const signaling = new SignalingClient(peerId);
+const index = new IndexClient();
+
+// ICE servers for NAT traversal: public STUN by default, refreshed from the
+// backend (which adds ephemeral TURN creds when configured). TURN creds are
+// short-lived, so re-fetch periodically. `iceReady` lets connection setup wait
+// for the best-available servers before the first offer/answer.
+let iceServers: RTCIceServer[] = [{ urls: ["stun:stun.l.google.com:19302"] }];
+let iceReady: Promise<void> = refreshIce();
+async function refreshIce(): Promise<void> {
+  const servers = await index.getIceServers().catch(() => null);
+  if (servers && servers.length) iceServers = servers;
+}
+setInterval(() => {
+  iceReady = refreshIce();
+}, 8 * 60 * 1000);
 
 interface Conn {
   pc: RTCPeerConnection;
@@ -25,7 +41,7 @@ interface Conn {
 const conns = new Map<string, Conn>();
 
 function newConn(remoteId: string): Conn {
-  const pc = new RTCPeerConnection({ iceServers: [] });
+  const pc = new RTCPeerConnection({ iceServers });
   const conn: Conn = { pc, pendingIce: [], remoteSet: false };
   pc.onicecandidate = (e) => {
     if (e.candidate) signaling.sendSignal(remoteId, { ice: e.candidate.toJSON() });
@@ -80,6 +96,7 @@ signaling.onSignal(async (from, signal: Signal) => {
   let conn = conns.get(from);
 
   if (sdp?.type === "offer") {
+    await iceReady;
     conn = conn ?? newConn(from);
     serveOn(conn.pc);
     await conn.pc.setRemoteDescription(sdp);
@@ -108,6 +125,7 @@ signaling.onSignal(async (from, signal: Signal) => {
 /** Fetcher side: pull a blob by CID from whichever peer holds it. */
 async function fetchBlob(cid: string): Promise<Uint8Array | null> {
   await signaling.connect();
+  await iceReady;
   const providers = await signaling.requestProviders(cid);
   const providerId = providers[0];
   if (!providerId) return null;

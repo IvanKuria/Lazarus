@@ -6,29 +6,31 @@ const bytes = (s: string) => new TextEncoder().encode(s);
 const b64 = (u: Uint8Array) => Buffer.from(u).toString("base64");
 
 // The server derives the observation (cid/urlKey/fingerprint) from these raw
-// fields — clients never supply content-addressing fields.
-function submissionBody(url: string, body: string, witnessId: string) {
+// fields — clients never supply content-addressing fields. The witness identity
+// comes from a server-issued token (minted at POST /v1/witness).
+function submissionBody(url: string, body: string, witnessToken: string) {
   return {
     url,
     snapshotBase64: b64(bytes(body)),
     text: "content long enough to fingerprint meaningfully for the test here",
     capturedAt: 1,
     title: "T",
-    witnessId,
+    witnessToken,
   };
+}
+
+async function mint(app: ReturnType<typeof buildApp>): Promise<string> {
+  const res = await app.inject({ method: "POST", url: "/v1/witness" });
+  return res.json().token as string;
 }
 
 describe("index HTTP API", () => {
   it("serves a resurrected snapshot after k distinct submissions", async () => {
     const app = buildApp(new MemoryIndexService({ k: 2 }));
 
-    const body = await submissionBody("https://x.com/a", "<h1>preserved</h1>", "w1");
+    const body = submissionBody("https://x.com/a", "<h1>preserved</h1>", await mint(app));
 
-    const post1 = await app.inject({
-      method: "POST",
-      url: "/v1/observations",
-      payload: body,
-    });
+    const post1 = await app.inject({ method: "POST", url: "/v1/observations", payload: body });
     expect(post1.statusCode).toBe(202);
 
     // Only one witness so far → not yet served.
@@ -38,11 +40,11 @@ describe("index HTTP API", () => {
     });
     expect(miss.statusCode).toBe(404);
 
-    // Second distinct witness promotes it.
+    // Second distinct witness (a fresh token = a distinct wid) promotes it.
     await app.inject({
       method: "POST",
       url: "/v1/observations",
-      payload: { ...body, witnessId: "w2" },
+      payload: { ...body, witnessToken: await mint(app) },
     });
 
     const hit = await app.inject({
@@ -61,7 +63,7 @@ describe("index HTTP API", () => {
     await app.inject({
       method: "POST",
       url: "/v1/observations",
-      payload: await submissionBody("https://x.com/p", "<p>v1</p>", "w1"),
+      payload: submissionBody("https://x.com/p", "<p>v1</p>", await mint(app)),
     });
 
     const versions = await app.inject({

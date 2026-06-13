@@ -1,20 +1,30 @@
 import { browser } from "wxt/browser";
+import type { IndexClient } from "./index-client.js";
 
 /**
- * Per-install anonymous witness token.
+ * Server-issued witness token for k-anonymity.
  *
- * Used by the index only to count DISTINCT witnesses for k-anonymity — never to
- * identify a user. Generated once and stored locally. (A future phase rotates it
- * for stronger unlinkability.)
+ * The index counts DISTINCT witnesses from the server-signed `wid` inside this
+ * token — never a client-chosen value — so k-anonymity can't be defeated by
+ * forging identities. We mint a short-lived token from the backend and cache it
+ * locally, re-minting when it nears expiry. Tokens identify no user.
  */
-const KEY = "lazarus:witnessId";
+const KEY = "lazarus:witnessToken";
+const REFRESH_BUFFER_MS = 60_000; // re-mint a minute before expiry
 
-export async function getWitnessId(): Promise<string> {
+interface CachedToken {
+  token: string;
+  exp: number; // epoch ms
+}
+
+export async function getWitnessToken(index: IndexClient): Promise<string> {
   const got = await browser.storage.local.get(KEY);
-  let id = got[KEY] as string | undefined;
-  if (!id) {
-    id = crypto.randomUUID();
-    await browser.storage.local.set({ [KEY]: id });
+  const cached = got[KEY] as CachedToken | undefined;
+  if (cached && cached.exp > Date.now() + REFRESH_BUFFER_MS) {
+    return cached.token;
   }
-  return id;
+  const { token, expiresInMs } = await index.mintWitnessToken();
+  const fresh: CachedToken = { token, exp: Date.now() + expiresInMs };
+  await browser.storage.local.set({ [KEY]: fresh });
+  return token;
 }
