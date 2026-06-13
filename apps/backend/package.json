@@ -1,0 +1,24 @@
+{
+  "name": "@lazarus/backend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Lazarus coordination backend — the central index/witness plane.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@lazarus/core": "workspace:*",
+    "fastify": "^5.8.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vitest": "^2.1.9"
+  }
+}
